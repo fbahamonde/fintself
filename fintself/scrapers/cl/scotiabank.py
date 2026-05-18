@@ -4,13 +4,14 @@ import re
 from decimal import Decimal
 from typing import List, Optional, Union
 
-from playwright.sync_api import Frame, FrameLocator, Locator, Page
-from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
-from playwright.sync_api import expect
+from patchright.sync_api import Frame, FrameLocator, Locator, Page
+from patchright.sync_api import TimeoutError as PlaywrightTimeoutError
+from patchright.sync_api import expect
 
 from fintself.core.exceptions import DataExtractionError, LoginError
 from fintself.core.models import MovementModel
 from fintself.scrapers.base import BaseScraper
+from fintself.utils import fingerprint
 from fintself.utils.logging import logger
 from fintself.utils.parsers import parse_chilean_amount, parse_chilean_date
 
@@ -135,6 +136,27 @@ class ScotiabankScraper(BaseScraper):
 
     def _get_bank_id(self) -> str:
         return "cl_scotiabank"
+
+    def _playwright_factory(self):
+        from patchright.sync_api import sync_playwright
+        return sync_playwright
+
+    def _browser_launch_kwargs(self) -> dict:
+        # If env forces headless explicit, honor it; otherwise auto by OS
+        from fintself import settings
+        explicit = settings.SCRAPER_HEADLESS_MODE
+        return fingerprint.browser_launch_kwargs(
+            headless=self.headless if explicit else None
+        )
+
+    def _browser_context_kwargs(self) -> dict:
+        return fingerprint.context_kwargs(
+            locale=self.locale,
+            timezone=self.timezone_id,
+        )
+
+    def _browser_init_script(self) -> str:
+        return fingerprint.init_script()
 
     # ─── Login ────────────────────────────────────────────────────────────
 
