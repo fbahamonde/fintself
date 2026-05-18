@@ -80,3 +80,45 @@ class TestBrowserLaunchKwargs:
             kw = fingerprint.browser_launch_kwargs(headless=False)
         assert kw["headless"] is False
         assert "--window-position=-2400,-2400" not in kw["args"]
+
+
+class TestContextKwargs:
+    def test_mac_user_agent_contains_macintosh(self):
+        p1, p2, p3 = _with_platform("Darwin")
+        with p1, p2, p3:
+            ck = fingerprint.context_kwargs()
+        assert "Macintosh" in ck["user_agent"]
+        assert "Chrome/131" in ck["user_agent"]
+
+    def test_sec_ch_ua_platform_matches_ua(self):
+        p1, p2, p3 = _with_platform("Darwin")
+        with p1, p2, p3:
+            ck = fingerprint.context_kwargs()
+        assert ck["extra_http_headers"]["sec-ch-ua-platform"] == '"macOS"'
+        assert ck["extra_http_headers"]["sec-ch-ua-mobile"] == "?0"
+
+    def test_mac_uses_retina_scale_factor(self):
+        p1, p2, p3 = _with_platform("Darwin")
+        with p1, p2, p3:
+            ck = fingerprint.context_kwargs()
+        assert ck["device_scale_factor"] == 2
+
+    def test_non_mac_uses_scale_factor_one(self):
+        p1, p2, p3 = _with_platform("Windows")
+        with p1, p2, p3:
+            ck = fingerprint.context_kwargs()
+        assert ck["device_scale_factor"] == 1
+        assert "Windows NT 10.0" in ck["user_agent"]
+
+    def test_passes_locale_and_timezone(self):
+        p1, p2, p3 = _with_platform("Darwin")
+        with p1, p2, p3:
+            ck = fingerprint.context_kwargs(locale="es-CL", timezone="America/Santiago")
+        assert ck["locale"] == "es-CL"
+        assert ck["timezone_id"] == "America/Santiago"
+
+    def test_viewport_and_screen_consistent(self):
+        p1, p2, p3 = _with_platform("Darwin")
+        with p1, p2, p3:
+            ck = fingerprint.context_kwargs()
+        assert ck["viewport"] == ck["screen"]
