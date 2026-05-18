@@ -101,3 +101,62 @@ def context_kwargs(*, locale: str = "es-CL",
             "accept-language": "es-CL,es;q=0.9,en;q=0.8",
         },
     }
+
+
+def init_script() -> str:
+    """Return a JS string to inject via `page.add_init_script()` for stealth."""
+    p = host_profile()
+    is_mac = p["is_mac"]
+    webgl_vendor = "Google Inc. (Apple)" if is_mac else "Google Inc. (Intel)"
+    webgl_renderer = (
+        "ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Unspecified Version)"
+        if is_mac
+        else "ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11)"
+    )
+    hw_concurrency = 8 if is_mac else 12
+    return f"""
+Object.defineProperty(navigator, 'webdriver', {{ get: () => undefined }});
+Object.defineProperty(navigator, 'platform', {{ get: () => '{p["nav_platform"]}' }});
+Object.defineProperty(navigator, 'languages', {{ get: () => ['es-CL', 'es', 'en'] }});
+Object.defineProperty(navigator, 'hardwareConcurrency', {{ get: () => {hw_concurrency} }});
+Object.defineProperty(navigator, 'deviceMemory', {{ get: () => 8 }});
+Object.defineProperty(navigator, 'maxTouchPoints', {{ get: () => 0 }});
+
+if (typeof window.chrome === 'undefined' || !window.chrome.runtime) {{
+    window.chrome = window.chrome || {{}};
+    window.chrome.runtime = window.chrome.runtime || {{}};
+    window.chrome.loadTimes = window.chrome.loadTimes || (() => ({{}}));
+    window.chrome.csi = window.chrome.csi || (() => ({{}}));
+}}
+
+const _origGetParameter = WebGLRenderingContext.prototype.getParameter;
+WebGLRenderingContext.prototype.getParameter = function(param) {{
+    if (param === 37445) return '{webgl_vendor}';
+    if (param === 37446) return '{webgl_renderer}';
+    return _origGetParameter.call(this, param);
+}};
+if (typeof WebGL2RenderingContext !== 'undefined') {{
+    WebGL2RenderingContext.prototype.getParameter = WebGLRenderingContext.prototype.getParameter;
+}}
+
+const _origQuery = navigator.permissions.query.bind(navigator.permissions);
+navigator.permissions.query = (descriptor) => (
+    descriptor && descriptor.name === 'notifications'
+        ? Promise.resolve({{ state: Notification.permission }})
+        : _origQuery(descriptor)
+);
+
+if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {{
+    const _origHE = navigator.userAgentData.getHighEntropyValues.bind(navigator.userAgentData);
+    navigator.userAgentData.getHighEntropyValues = (hints) => Promise.resolve({{
+        platform: {p["ch_platform"]},
+        platformVersion: {p["ch_platform_version"]},
+        architecture: {p["arch"]},
+        bitness: "64",
+        model: "",
+        mobile: false,
+        uaFullVersion: "{CHROME_FULL}",
+        brands: navigator.userAgentData.brands,
+    }});
+}}
+""".strip()

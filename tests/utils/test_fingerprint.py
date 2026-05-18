@@ -122,3 +122,52 @@ class TestContextKwargs:
         with p1, p2, p3:
             ck = fingerprint.context_kwargs()
         assert ck["viewport"] == ck["screen"]
+
+
+class TestInitScript:
+    def test_contains_webdriver_override(self):
+        p1, p2, p3 = _with_platform("Darwin")
+        with p1, p2, p3:
+            s = fingerprint.init_script()
+        assert "'webdriver'" in s
+        assert "() => undefined" in s
+
+    def test_contains_webgl_param_overrides(self):
+        p1, p2, p3 = _with_platform("Darwin")
+        with p1, p2, p3:
+            s = fingerprint.init_script()
+        assert "37445" in s
+        assert "37446" in s
+
+    def test_mac_webgl_renderer_is_apple(self):
+        p1, p2, p3 = _with_platform("Darwin")
+        with p1, p2, p3:
+            s = fingerprint.init_script()
+        assert "Apple" in s
+
+    def test_non_mac_webgl_renderer_is_intel(self):
+        p1, p2, p3 = _with_platform("Windows")
+        with p1, p2, p3:
+            s = fingerprint.init_script()
+        assert "Intel" in s
+
+    def test_contains_chrome_runtime_stub(self):
+        p1, p2, p3 = _with_platform("Darwin")
+        with p1, p2, p3:
+            s = fingerprint.init_script()
+        assert "window.chrome" in s
+        assert "runtime" in s
+
+    def test_contains_permissions_query_patch(self):
+        p1, p2, p3 = _with_platform("Darwin")
+        with p1, p2, p3:
+            s = fingerprint.init_script()
+        assert "navigator.permissions.query" in s
+        assert "notifications" in s
+
+    def test_braces_balanced(self):
+        p1, p2, p3 = _with_platform("Darwin")
+        with p1, p2, p3:
+            s = fingerprint.init_script()
+        assert s.count("{") == s.count("}")
+        assert s.count("(") == s.count(")")
