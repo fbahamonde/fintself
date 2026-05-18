@@ -4,13 +4,14 @@ import re
 from decimal import Decimal
 from typing import List, Optional, Union
 
-from playwright.sync_api import Frame, FrameLocator, Locator, Page
-from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
-from playwright.sync_api import expect
+from patchright.sync_api import Frame, FrameLocator, Locator, Page
+from patchright.sync_api import TimeoutError as PlaywrightTimeoutError
+from patchright.sync_api import expect
 
 from fintself.core.exceptions import DataExtractionError, LoginError
 from fintself.core.models import MovementModel
 from fintself.scrapers.base import BaseScraper
+from fintself.utils import fingerprint
 from fintself.utils.logging import logger
 from fintself.utils.parsers import parse_chilean_amount, parse_chilean_date
 
@@ -135,6 +136,31 @@ class ScotiabankScraper(BaseScraper):
 
     def _get_bank_id(self) -> str:
         return "cl_scotiabank"
+
+    def _playwright_factory(self):
+        from patchright.sync_api import sync_playwright
+        return sync_playwright
+
+    def _browser_launch_kwargs(self) -> dict:
+        # Invisible via --headless=new by default. Debug mode -> visible window.
+        # debug_mode is set in BaseScraper.__init__ from settings.DEBUG env var.
+        headless = False if self.debug_mode else None
+        return fingerprint.browser_launch_kwargs(headless=headless)
+
+    def _browser_context_kwargs(self) -> dict:
+        return fingerprint.context_kwargs(
+            locale=self.locale,
+            timezone=self.timezone_id,
+        )
+
+    def _browser_init_script(self) -> str | None:
+        # Workaround: patchright + real Chrome breaks DNS when add_init_script
+        # is invoked at context OR page level (any content, even empty).
+        # Patchright already patches navigator.webdriver via binary patches,
+        # so the core leak is covered without init_script. Other patches
+        # (chrome.runtime stub, languages enrichment, WebGL spoof) are
+        # deferred — apply post-navigation via page.evaluate if needed.
+        return None
 
     # ─── Login ────────────────────────────────────────────────────────────
 

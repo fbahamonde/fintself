@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+from patchright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from fintself.core.exceptions import LoginError
 from fintself.scrapers.cl.scotiabank import ScotiabankScraper
@@ -21,6 +21,9 @@ def scraper() -> ScotiabankScraper:
     s.playwright = None
     s.browser = None
     s.page = MagicMock()
+    s.headless = False
+    s.locale = "es-CL"
+    s.timezone_id = "America/Santiago"
     return s
 
 
@@ -817,3 +820,41 @@ class TestDismissHomePopup:
         result = scraper._dismiss_home_popup(page)
 
         assert result is False
+
+
+class TestScotiabankImports:
+    def test_uses_patchright_not_playwright(self):
+        import inspect
+        from fintself.scrapers.cl import scotiabank as mod
+        src = inspect.getsource(mod)
+        assert "from patchright.sync_api" in src
+        for line in src.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("from playwright.sync_api") and not stripped.startswith("#"):
+                raise AssertionError(f"Leftover playwright import: {line!r}")
+
+
+class TestScotiabankBrowserConfig:
+    def test_browser_launch_kwargs_uses_chrome_channel(self, scraper):
+        kw = scraper._browser_launch_kwargs()
+        assert kw["channel"] == "chrome"
+        assert "ignore_default_args" in kw
+        assert "--enable-automation" in kw["ignore_default_args"]
+
+    def test_browser_context_kwargs_has_sec_ch_ua(self, scraper):
+        kw = scraper._browser_context_kwargs()
+        assert "extra_http_headers" in kw
+        assert "sec-ch-ua-platform" in kw["extra_http_headers"]
+        assert kw["locale"] == "es-CL"
+        assert kw["timezone_id"] == "America/Santiago"
+
+    def test_browser_init_script_returns_none(self, scraper):
+        # Workaround: patchright + real Chrome breaks DNS when add_init_script
+        # is invoked. Patchright already patches webdriver via binary patches.
+        # See scotiabank.py _browser_init_script for full rationale.
+        assert scraper._browser_init_script() is None
+
+    def test_playwright_factory_returns_patchright(self, scraper):
+        factory = scraper._playwright_factory()
+        cm = factory()
+        assert "patchright" in type(cm).__module__

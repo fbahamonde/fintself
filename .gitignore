@@ -226,3 +226,10 @@ TO_DO.md
 RESUME.md
 /recon/
 scripts/_*.py
+# Browser profiles + session artifacts (stealth scraping)
+*-profile/
+chrome-data/
+user-data-dir/
+*.session
+*.pickle
+debug/

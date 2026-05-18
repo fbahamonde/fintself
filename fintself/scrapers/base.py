@@ -10,7 +10,6 @@ from playwright.sync_api import (
     Locator,
     Page,
     Playwright,
-    sync_playwright,
 )
 from playwright.sync_api import (
     TimeoutError as PlaywrightTimeoutError,
@@ -66,6 +65,32 @@ class BaseScraper(ABC):
         self.page: Optional[Page] = None
         self.user: Optional[str] = None
         self.password: Optional[str] = None
+
+    def _playwright_factory(self):
+        """Return the `sync_playwright` callable. Override to use a fork
+        (e.g. `patchright.sync_api.sync_playwright`)."""
+        from playwright.sync_api import sync_playwright
+        return sync_playwright
+
+    def _browser_launch_kwargs(self) -> dict:
+        """Return kwargs for `chromium.launch()`. Default = legacy behavior."""
+        return {
+            "headless": self.headless,
+            "slow_mo": self.slow_mo,
+        }
+
+    def _browser_context_kwargs(self) -> dict:
+        """Return kwargs for `browser.new_context()`. Default = legacy behavior."""
+        return {
+            "user_agent": self.user_agent,
+            "viewport": self.viewport,
+            "locale": self.locale,
+            "timezone_id": self.timezone_id,
+        }
+
+    def _browser_init_script(self) -> Optional[str]:
+        """Return JS string for `page.add_init_script()`. Default = legacy one-liner."""
+        return "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
 
     @abstractmethod
     def _get_bank_id(self) -> str:
@@ -327,26 +352,21 @@ class BaseScraper(ABC):
         self.user = user
         self.password = password
 
-        with sync_playwright() as p:
+        sync_playwright_fn = self._playwright_factory()
+        with sync_playwright_fn() as p:
             self.playwright = p
             try:
+                launch_kwargs = self._browser_launch_kwargs()
                 logger.info(
-                    f"Launching browser for {self._get_bank_id()} (headless: {self.headless})..."
+                    f"Launching browser for {self._get_bank_id()} "
+                    f"(headless: {launch_kwargs.get('headless')})..."
                 )
-                self.browser = self.playwright.chromium.launch(
-                    headless=self.headless, slow_mo=self.slow_mo
-                )
+                self.browser = self.playwright.chromium.launch(**launch_kwargs)
 
-                context_options = {
-                    "user_agent": self.user_agent,
-                    "viewport": self.viewport,
-                    "locale": self.locale,
-                    "timezone_id": self.timezone_id,
-                }
-                context = self.browser.new_context(**context_options)
-                context.add_init_script(
-                    "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-                )
+                context = self.browser.new_context(**self._browser_context_kwargs())
+                init_script = self._browser_init_script()
+                if init_script:
+                    context.add_init_script(init_script)
                 self.page = context.new_page()
                 self.page.set_default_timeout(self.default_timeout)
 

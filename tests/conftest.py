@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Iterator
 
 import pytest
-from playwright.sync_api import Browser, Page, sync_playwright
+from patchright.sync_api import Browser, Page, sync_playwright
 
 
 @pytest.fixture(scope="session")
