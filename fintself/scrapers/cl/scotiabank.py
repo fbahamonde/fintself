@@ -155,8 +155,14 @@ class ScotiabankScraper(BaseScraper):
             timezone=self.timezone_id,
         )
 
-    def _browser_init_script(self) -> str:
-        return fingerprint.init_script()
+    def _browser_init_script(self) -> str | None:
+        # Workaround: patchright + real Chrome breaks DNS when add_init_script
+        # is invoked at context OR page level (any content, even empty).
+        # Patchright already patches navigator.webdriver via binary patches,
+        # so the core leak is covered without init_script. Other patches
+        # (chrome.runtime stub, languages enrichment, WebGL spoof) are
+        # deferred — apply post-navigation via page.evaluate if needed.
+        return None
 
     # ─── Login ────────────────────────────────────────────────────────────
 

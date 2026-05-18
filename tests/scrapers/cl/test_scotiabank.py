@@ -848,11 +848,11 @@ class TestScotiabankBrowserConfig:
         assert kw["locale"] == "es-CL"
         assert kw["timezone_id"] == "America/Santiago"
 
-    def test_browser_init_script_contains_webdriver_and_webgl(self, scraper):
-        s = scraper._browser_init_script()
-        assert "webdriver" in s
-        assert "37445" in s
-        assert "37446" in s
+    def test_browser_init_script_returns_none(self, scraper):
+        # Workaround: patchright + real Chrome breaks DNS when add_init_script
+        # is invoked. Patchright already patches webdriver via binary patches.
+        # See scotiabank.py _browser_init_script for full rationale.
+        assert scraper._browser_init_script() is None
 
     def test_playwright_factory_returns_patchright(self, scraper):
         factory = scraper._playwright_factory()
