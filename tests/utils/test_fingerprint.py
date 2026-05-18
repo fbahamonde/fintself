@@ -46,40 +46,39 @@ class TestHostProfile:
 
 
 class TestBrowserLaunchKwargs:
-    def test_macos_default_uses_offscreen_window(self):
+    """Pattern: always pass headless=False to Playwright (so it does NOT inject
+    legacy --headless), then add --headless=new manually for invisibility."""
+
+    def test_default_is_invisible_via_headless_new(self):
         p1, p2, p3 = _with_platform("Darwin")
         with p1, p2, p3:
             kw = fingerprint.browser_launch_kwargs()
         assert kw["channel"] == "chrome"
         assert kw["headless"] is False
+        assert "--headless=new" in kw["args"]
         assert "--disable-blink-features=AutomationControlled" in kw["args"]
-        assert "--window-position=-2400,-2400" in kw["args"]
-        assert "--window-size=1440,900" in kw["args"]
         assert kw["ignore_default_args"] == ["--enable-automation"]
-        assert "--headless=new" not in kw["args"]
 
-    def test_linux_default_uses_new_headless(self):
+    def test_default_invisible_on_linux_too(self):
         p1, p2, p3 = _with_platform("Linux", machine="x86_64")
         with p1, p2, p3:
             kw = fingerprint.browser_launch_kwargs()
-        assert kw["channel"] == "chrome"
-        assert kw["headless"] is True
+        assert kw["headless"] is False
         assert "--headless=new" in kw["args"]
-        assert "--window-position=-2400,-2400" not in kw["args"]
 
-    def test_explicit_headless_true_on_mac_respected(self):
+    def test_headless_true_same_as_default(self):
         p1, p2, p3 = _with_platform("Darwin")
         with p1, p2, p3:
             kw = fingerprint.browser_launch_kwargs(headless=True)
-        assert kw["headless"] is True
-        assert "--window-position=-2400,-2400" not in kw["args"]
+        assert kw["headless"] is False
+        assert "--headless=new" in kw["args"]
 
-    def test_explicit_headless_false_on_linux_adds_offscreen_on_mac_only(self):
-        p1, p2, p3 = _with_platform("Linux", machine="x86_64")
+    def test_headless_false_means_visible_for_debug(self):
+        p1, p2, p3 = _with_platform("Darwin")
         with p1, p2, p3:
             kw = fingerprint.browser_launch_kwargs(headless=False)
         assert kw["headless"] is False
-        assert "--window-position=-2400,-2400" not in kw["args"]
+        assert "--headless=new" not in kw["args"]
 
 
 class TestContextKwargs:

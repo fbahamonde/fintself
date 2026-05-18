@@ -49,23 +49,27 @@ def host_profile() -> dict:
 def browser_launch_kwargs(*, headless: bool | None = None) -> dict:
     """Return kwargs for `chromium.launch()`.
 
-    headless=None  -> auto: True on Linux, False on Darwin/Windows
-    headless=True  -> use --headless=new on Linux; no offscreen on mac
-    headless=False -> on mac, render offscreen via --window-position
+    headless=None  -> auto: invisible via --headless=new (no window, real engine)
+    headless=True  -> same as None (invisible via --headless=new)
+    headless=False -> visible window (debug only)
+
+    Critical pattern (plasticity / undetected):
+      To use --headless=new we pass `headless=False` to Playwright so it does
+      NOT inject the legacy `--headless` flag (detectable), then add
+      `--headless=new` manually to args. Result: full Chrome engine, no
+      visible window, fingerprint matches headed Chrome.
     """
-    sys = platform.system()
-    if headless is None:
-        headless = (sys == "Linux")
+    invisible = True if headless is None else headless
 
     args = ["--disable-blink-features=AutomationControlled"]
-    if headless and sys == "Linux":
+    if invisible:
         args.append("--headless=new")
-    elif not headless and sys == "Darwin":
-        args += ["--window-position=-2400,-2400", "--window-size=1440,900"]
 
     return {
         "channel": "chrome",
-        "headless": headless,
+        # Always False so Playwright won't inject legacy --headless.
+        # Invisibility comes from --headless=new in args instead.
+        "headless": False,
         "args": args,
         "ignore_default_args": ["--enable-automation"],
     }

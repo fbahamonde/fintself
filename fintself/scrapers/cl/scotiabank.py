@@ -142,12 +142,10 @@ class ScotiabankScraper(BaseScraper):
         return sync_playwright
 
     def _browser_launch_kwargs(self) -> dict:
-        # If env forces headless explicit, honor it; otherwise auto by OS
-        from fintself import settings
-        explicit = settings.SCRAPER_HEADLESS_MODE
-        return fingerprint.browser_launch_kwargs(
-            headless=self.headless if explicit else None
-        )
+        # Invisible via --headless=new by default. Debug mode -> visible window.
+        # debug_mode is set in BaseScraper.__init__ from settings.DEBUG env var.
+        headless = False if self.debug_mode else None
+        return fingerprint.browser_launch_kwargs(headless=headless)
 
     def _browser_context_kwargs(self) -> dict:
         return fingerprint.context_kwargs(
