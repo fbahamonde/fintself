@@ -44,3 +44,28 @@ def host_profile() -> dict:
         "arch": '"x86"',
         "is_mac": False,
     }
+
+
+def browser_launch_kwargs(*, headless: bool | None = None) -> dict:
+    """Return kwargs for `chromium.launch()`.
+
+    headless=None  -> auto: True on Linux, False on Darwin/Windows
+    headless=True  -> use --headless=new on Linux; no offscreen on mac
+    headless=False -> on mac, render offscreen via --window-position
+    """
+    sys = platform.system()
+    if headless is None:
+        headless = (sys == "Linux")
+
+    args = ["--disable-blink-features=AutomationControlled"]
+    if headless and sys == "Linux":
+        args.append("--headless=new")
+    elif not headless and sys == "Darwin":
+        args += ["--window-position=-2400,-2400", "--window-size=1440,900"]
+
+    return {
+        "channel": "chrome",
+        "headless": headless,
+        "args": args,
+        "ignore_default_args": ["--enable-automation"],
+    }

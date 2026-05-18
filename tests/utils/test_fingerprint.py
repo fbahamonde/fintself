@@ -43,3 +43,40 @@ class TestHostProfile:
         assert prof["ch_platform"] == '"Linux"'
         assert prof["nav_platform"] == "Linux x86_64"
         assert prof["is_mac"] is False
+
+
+class TestBrowserLaunchKwargs:
+    def test_macos_default_uses_offscreen_window(self):
+        p1, p2, p3 = _with_platform("Darwin")
+        with p1, p2, p3:
+            kw = fingerprint.browser_launch_kwargs()
+        assert kw["channel"] == "chrome"
+        assert kw["headless"] is False
+        assert "--disable-blink-features=AutomationControlled" in kw["args"]
+        assert "--window-position=-2400,-2400" in kw["args"]
+        assert "--window-size=1440,900" in kw["args"]
+        assert kw["ignore_default_args"] == ["--enable-automation"]
+        assert "--headless=new" not in kw["args"]
+
+    def test_linux_default_uses_new_headless(self):
+        p1, p2, p3 = _with_platform("Linux", machine="x86_64")
+        with p1, p2, p3:
+            kw = fingerprint.browser_launch_kwargs()
+        assert kw["channel"] == "chrome"
+        assert kw["headless"] is True
+        assert "--headless=new" in kw["args"]
+        assert "--window-position=-2400,-2400" not in kw["args"]
+
+    def test_explicit_headless_true_on_mac_respected(self):
+        p1, p2, p3 = _with_platform("Darwin")
+        with p1, p2, p3:
+            kw = fingerprint.browser_launch_kwargs(headless=True)
+        assert kw["headless"] is True
+        assert "--window-position=-2400,-2400" not in kw["args"]
+
+    def test_explicit_headless_false_on_linux_adds_offscreen_on_mac_only(self):
+        p1, p2, p3 = _with_platform("Linux", machine="x86_64")
+        with p1, p2, p3:
+            kw = fingerprint.browser_launch_kwargs(headless=False)
+        assert kw["headless"] is False
+        assert "--window-position=-2400,-2400" not in kw["args"]
