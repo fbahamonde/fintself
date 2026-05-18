@@ -129,6 +129,10 @@ class ScotiabankScraper(BaseScraper):
         ".modal button[aria-label='Cerrar']",
     ]
 
+    # Promotional modal on scotiabank.cl home (intermitente, intercepta 'Acceso Scotia')
+    HOME_PROMO_CLOSE_SELECTOR = "a.sc-itt-close-btn"
+    HOME_PROMO_TIMEOUT_MS = 5000
+
     def _get_bank_id(self) -> str:
         return "cl_scotiabank"
 
@@ -145,6 +149,7 @@ class ScotiabankScraper(BaseScraper):
         logger.info("Navigating to Scotiabank Chile home page.")
         self._navigate(self.HOME_URL, timeout_override=60000)
         self._save_debug_info("01_home_page")
+        self._dismiss_home_popup(page)
 
         logger.info("Opening 'Acceso Scotia' menu.")
         try:
@@ -249,6 +254,35 @@ class ScotiabankScraper(BaseScraper):
             page.wait_for_timeout(self.TOUR_POLL_INTERVAL_MS)
             elapsed += self.TOUR_POLL_INTERVAL_MS
         return False
+
+    def _dismiss_home_popup(self, page: Page) -> bool:
+        """Dismiss promotional modal that may appear on scotiabank.cl home.
+
+        Returns True if a popup was found and the close button was clicked,
+        False if no popup was detected within the timeout or the click failed.
+        Never raises — the login flow must continue regardless.
+        """
+        try:
+            page.wait_for_selector(
+                self.HOME_PROMO_CLOSE_SELECTOR,
+                state="visible",
+                timeout=self.HOME_PROMO_TIMEOUT_MS,
+            )
+        except PlaywrightTimeoutError:
+            logger.debug(
+                "[home] no promo popup detected within %dms",
+                self.HOME_PROMO_TIMEOUT_MS,
+            )
+            return False
+        try:
+            page.locator(self.HOME_PROMO_CLOSE_SELECTOR).first.click(timeout=2000)
+            logger.info("[home] dismissed promo popup")
+            self._save_debug_info("home_popup_dismissed")
+            return True
+        except Exception as exc:
+            logger.warning("[home] popup found but click failed: %s", exc)
+            self._save_debug_info("home_popup_click_failed")
+            return False
 
     # ─── Iframe routing ───────────────────────────────────────────────────
 

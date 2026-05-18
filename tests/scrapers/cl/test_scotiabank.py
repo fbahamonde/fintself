@@ -417,9 +417,7 @@ class TestFixtureStructure:
             html = self._fixture(name)
             ruts_dotted = re.findall(r"\b\d{1,2}\.\d{3}\.\d{3}-[\dkK]\b", html)
             unexpected = [r for r in ruts_dotted if r != "12.345.678-9"]
-            assert not unexpected, (
-                f"{name}: unexpected RUT(s) {unexpected}"
-            )
+            assert not unexpected, f"{name}: unexpected RUT(s) {unexpected}"
             assert not re.search(r"\b\d{7,8}-[\dkK]\b", html), (
                 f"{name}: bare-digit RUT pattern found"
             )
@@ -766,3 +764,56 @@ class TestParseChileanAmountScotiaCases:
         from fintself.utils.parsers import parse_chilean_amount
 
         assert parse_chilean_amount(amount_str) == Decimal(expected)
+
+
+class TestDismissHomePopup:
+    """Tests for _dismiss_home_popup: defensive close of promo modal on home."""
+
+    def test_clicks_close_when_popup_visible(self, scraper, fixture_page):
+        from pathlib import Path
+
+        fixture = (
+            Path(__file__).resolve().parents[2]
+            / "fixtures"
+            / "cl"
+            / "scotiabank"
+            / "home_with_popup.html"
+        )
+        assert fixture.exists(), f"Missing fixture: {fixture}"
+        fixture_page.set_content(fixture.read_text(encoding="utf-8"))
+
+        result = scraper._dismiss_home_popup(fixture_page)
+
+        assert result is True
+
+    def test_returns_false_silently_when_no_popup(
+        self, scraper, fixture_page, monkeypatch
+    ):
+        from pathlib import Path
+
+        fixture = (
+            Path(__file__).resolve().parents[2]
+            / "fixtures"
+            / "cl"
+            / "scotiabank"
+            / "home_without_popup.html"
+        )
+        assert fixture.exists(), f"Missing fixture: {fixture}"
+        fixture_page.set_content(fixture.read_text(encoding="utf-8"))
+        monkeypatch.setattr(scraper, "HOME_PROMO_TIMEOUT_MS", 200)
+
+        result = scraper._dismiss_home_popup(fixture_page)
+
+        assert result is False
+
+    def test_returns_false_when_click_fails(self, scraper, mocker):
+        """Popup detected but click raises — must not crash login flow."""
+        page = mocker.MagicMock()
+        page.wait_for_selector.return_value = None
+        page.locator.return_value.first.click.side_effect = Exception(
+            "click intercepted"
+        )
+
+        result = scraper._dismiss_home_popup(page)
+
+        assert result is False
